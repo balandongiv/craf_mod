@@ -1,22 +1,32 @@
 from os import path as osp
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+import itertools as it
 root='/home/cisir4/anaconda3/resources/ocsource/batch1/craft'
 # fname='res_N0_AG_EL' # Ideal image
-
-fname='res_N0_AG_ES' # Example two box at the middle character
+import math
+# fname='res_N0_AG_ES' # Example two box at the middle character.
+fname='res_N2_AG_Cd' # Example two box at the middle and bottom character
 img=osp.join(root,f'{fname}.jpg')
 bb=osp.join(root,f'{fname}.txt')
-
-
+# Load image, grayscale, median blur, sharpen image
+image = cv2.imread(img)
+# plt.imshow(image)
+# plt.show()
+nlim=image.shape[0]/2
 with open(bb) as file:
     lines = file.readlines()
     lines = [line.rstrip() for line in lines]
 
 
-CentValMin=1000
-CentValMax=1200
+# CentValMin=1000
+# CentValMax=1200
+CentValMin=nlim-100
+CentValMax=nlim+200
 
-charsHeight=550 # Typical height of a bb with two characters
-charsWidth=120  # Typical widht of a bb with two characters
+charsHeight=90 # Typical height of a bb with two characters
+charsWidth=170  # Typical widht of a bb with two characters
 
 # First get only box at centre
 pot_val=[]
@@ -25,14 +35,6 @@ for dline in lines:
     if CentValMin<lst_int[0]<CentValMax:
         pot_val.append(dict(bboxes=lst_int))
 
-# Lets have a
-#         min_x = min(bbox[0:-1:2])
-#         min_y = min(bbox[1:-1:2])
-#         max_x = max(bbox[0:-1:2])
-#         max_y = max(bbox[1:-1:2])
-#         box = [
-#             min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y
-#         ]
 
 def nchars_determination(dpots):
     # Lets get the rectangle size to determine whether the box contain single or double characters
@@ -50,26 +52,132 @@ def nchars_determination(dpots):
     max_y=min(dpots['bboxes'][7],dpots['bboxes'][5])
     box_dim_coor=[min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]
 
+    # dst_img = image[min_y:max_y, min_x:max_x]
+    # plt.imshow(dst_img)
+    # plt.show()
+
     #
-    blenght=abs(min_x-min_y)
+    bwidht=abs(min_x-max_x)
     bheight=abs(min_y-max_y)
 
-    if blenght<charsWidth:
-        nchar=1
-    else:
+    if bwidht>charsWidth:
         nchar=2
+    else:
+        nchar=1
 
     dpots.update(dict(nchar=nchar,
                       box_dim_coor=box_dim_coor,
-                      blenght=blenght,
-                      bheight=bheight))
+                      bheight=bheight,
+                      bwidht=bwidht))
 
     return dpots
 pot_val=[nchars_determination (dpots) for dpots in pot_val]
 
-# Next, if there are more than 3 bboxes, high chances there is level that contain single character at each boxes
 
-# def combine_modular_bboxes (dpots):
+def get_angle(x1,y1,x2,y2):
+    return math.degrees(math.atan2(y2-y1, x2-x1))
 
-# nstat=[combine_modular_bboxes (dpots) for dpots in pot_val]
+def combine_modular_bboxes (dpots):
+    # Next, if there are more than 3 bboxes, high chances there is level that contain single character at each boxes
+
+    gud_bbox=[]
+    single_bbox=[]
+    for dpot in dpots:
+        if dpot['nchar']>=2:
+            gud_bbox.append(dpot)
+        else:
+            # do something
+            single_bbox.append(dpot)
+    rr=list(set(it.combinations(range(len(single_bbox)), 2)))
+    rr=[rr[3]]
+    nval=[]
+    for p0,p1 in rr:
+        x1=single_bbox[p0]['bboxes'][0]
+        x2=single_bbox[p1]['bboxes'][0]
+
+
+        # Always ensure the pivot point is at extreme left
+        if x1>x2:
+            # If x1 is greaterm we need to swap x1 to x2 in order to get left pivot
+            xMaxC=1
+            xMinC=0
+
+
+            x1a=single_bbox[p1]['bboxes'][0]
+            y1a=single_bbox[p1]['bboxes'][1]
+            x1d=single_bbox[p1]['bboxes'][6]
+            y1d=single_bbox[p1]['bboxes'][7]
+
+            x2b=single_bbox[p0]['bboxes'][2]
+            y2b=single_bbox[p0]['bboxes'][3]
+            x2c=single_bbox[p0]['bboxes'][4]
+            y2c=single_bbox[p0]['bboxes'][5]
+
+            min_x=max(x1a,x1d)
+            min_y=max(y1a,y2b)
+            max_x=max(x2c,x2b)
+            max_y=max(y1d,y2c)
+            box_dim_coor=[min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]
+            plt.imshow(image)
+            # # plt.scatter([min_x,max_x,
+            # #              min_x,max_x], [min_y,min_y,
+            # #                             max_y,max_y], c ="blue")
+            plt.scatter([x1a], [y1a], c ="blue",marker='s')
+            plt.scatter([x1d], [y1d], c ="red",marker='s')
+
+            plt.scatter([x2b], [y2b], c ="black",marker='^')
+            plt.scatter([x2c], [y2c], c ="green",marker='v')
+            # plt.scatter([x2], [y2], c ="black")
+            plt.show()
+            # Xmax=
+            h=1
+            angl=abs(get_angle(x1a,y1a,x2b,y2b))
+        else:
+            x1a=single_bbox[p0]['bboxes'][0]
+            y1a=single_bbox[p0]['bboxes'][1]
+
+            x1d=single_bbox[p0]['bboxes'][6]
+            y1d=single_bbox[p0]['bboxes'][7]
+
+
+            x2b=single_bbox[p1]['bboxes'][2]
+            y2b=single_bbox[p1]['bboxes'][3]
+            x2c=single_bbox[p1]['bboxes'][4]
+            y2c=single_bbox[p1]['bboxes'][5]
+            min_x=max(x1a,x1d)
+            min_y=max(y1a,y2b)
+            max_x=max(x2c,x2b)
+            max_y=max(y1d,y2c)
+            box_dim_coor=[min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]
+
+            plt.imshow(image)
+            # plt.scatter([min_x,max_x,
+            #              min_x,max_x], [min_y,min_y,
+            #                             max_y,max_y], c ="blue")
+            plt.scatter([x1a], [y1a], c ="blue",marker='s')
+            plt.scatter([x1d], [y1d], c ="red",marker='s')
+
+            plt.scatter([x2b], [y2b], c ="black",marker='^')
+            plt.scatter([x2c], [y2c], c ="green",marker='v')
+            plt.show()
+            # Xmax=
+            h=1
+
+            angl=abs(get_angle(x1a,y1a,x2b,y2b))
+
+        tt=1
+        if angl<5:
+            dst_img = image[min_y:max_y, min_x:max_x]
+            plt.imshow(dst_img)
+            plt.show()
+            jjjk=   dict(nchar=2,
+                         box_dim_coor=box_dim_coor,
+                         bheight=abs(max_y-max_y),
+                         bwidht=(max_x-max_x))
+            nval.append(jjjk)
+        j=1
+        # Get the possible box dimension
+    h=1
+
+combine_modular_bboxes (pot_val)
 y=1
