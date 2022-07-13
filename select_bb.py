@@ -7,7 +7,32 @@ root='/home/cisir4/anaconda3/resources/ocsource/batch1/craft'
 # fname='res_N0_AG_EL' # Ideal image
 import math
 # fname='res_N0_AG_ES' # Example two box at the middle character.
-fname='res_N2_AG_Cd' # Example two box at the middle and bottom character
+# fname='res_N2_AB_MG' # Example two box at the bottom character.
+# fname='res_N2_AG_H9' # Example two box at the middle but with uneven box.
+# fname='res_N3_CE_I2' # Example two box at the bottom but with uneven box.
+# fname='res_N1_DG_Am' # Example two box at the bottom but with uneven box.
+fname='res_N3_CE_I2' # Example two box at the bottom but with uneven box.
+
+# fname='res_N0_AG_EX' # Example two box at the bottom but with uneven box.
+
+# fname='res_N2_AG_Cd' # Example two box at the middle and bottom character
+
+# fname='res_N1_DG_An' # Example two box at the middle and bottom character
+# fname='res_N1_DG_Bj' # Example missing left middle character
+
+
+# fname='res_N2_DG_Bf' # Example missing left middle character
+# fname='res_N1_DG_AS' # Example missing left middle character
+
+
+
+
+# TO DO LAST
+# fname='res_N2_DG_Aj' # Example missing half middle and both bottom bbox (KIV)
+
+# fname='res_N2_AG_Cd' # Example missing half middle and both bottom bbox (KIV)
+# fname='res_N1_DG_Bj' # Example missing half middle and both bottom bbox (KIV)
+
 img=osp.join(root,f'{fname}.jpg')
 bb=osp.join(root,f'{fname}.txt')
 # Load image, grayscale, median blur, sharpen image
@@ -19,7 +44,10 @@ with open(bb) as file:
     lines = file.readlines()
     lines = [line.rstrip() for line in lines]
 
-
+# TODO
+"""
+Issue croping the RES_N0_AG_EX 
+"""
 # CentValMin=1000
 # CentValMax=1200
 CentValMin=nlim-100
@@ -89,7 +117,7 @@ def combine_modular_bboxes (dpots):
             # do something
             single_bbox.append(dpot)
     rr=list(set(it.combinations(range(len(single_bbox)), 2)))
-    rr=[rr[3]]
+    # rr=[rr[3]]
     nval=[]
     for p0,p1 in rr:
         x1=single_bbox[p0]['bboxes'][0]
@@ -99,8 +127,6 @@ def combine_modular_bboxes (dpots):
         # Always ensure the pivot point is at extreme left
         if x1>x2:
             # If x1 is greaterm we need to swap x1 to x2 in order to get left pivot
-            xMaxC=1
-            xMinC=0
 
 
             x1a=single_bbox[p1]['bboxes'][0]
@@ -166,7 +192,16 @@ def combine_modular_bboxes (dpots):
             angl=abs(get_angle(x1a,y1a,x2b,y2b))
 
         tt=1
-        if angl<5:
+        if angl<12:
+            """
+            res_N3_CE_I2 require more than 5, lets try 8
+            
+            res_N1_DG_An
+            
+            RES_N0_AG_EX require 10
+            TODO
+            Issue cropping RES_N0_AG_EX, N1_DG_Am
+            """
             dst_img = image[min_y:max_y, min_x:max_x]
             plt.imshow(dst_img)
             plt.show()
