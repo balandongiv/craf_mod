@@ -55,7 +55,7 @@ parser.add_argument('--canvas_size', default=2048, type=int, help='image size fo
 parser.add_argument('--mag_ratio', default=1.5, type=float, help='image magnification ratio')
 parser.add_argument('--poly', default=False, action='store_true', help='enable polygon type')
 parser.add_argument('--show_time', default=True, action='store_true', help='show processing time')
-parser.add_argument('--test_folder', default='/home/cisir4/anaconda3/resources/ocsource/batch2/imgs', type=str, help='folder path to input images')
+parser.add_argument('--test_folder', default='/home/cisir4/anaconda3/resources/ocsource/batch1/imgs', type=str, help='folder path to input images')
 parser.add_argument('--refine', default=False, action='store_true', help='enable link refiner')
 parser.add_argument('--refiner_model', default='weights/craft_refiner_CTW1500.pth', type=str, help='pretrained refiner model')
 
@@ -91,36 +91,9 @@ def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, r
     score_text = y[0,:,:,0].cpu().data.numpy()
     score_link = y[0,:,:,1].cpu().data.numpy()
 
-    # refine link
-    if refine_net is not None:
-        with torch.no_grad():
-            y_refiner = refine_net(y, feature)
-        score_link = y_refiner[0,:,:,0].cpu().data.numpy()
 
-    t0 = time.time() - t0
-    t1 = time.time()
 
-    # Post-processing
-    boxes, polys = craft_utils.getDetBoxes(score_text, score_link,
-                                           text_threshold, link_threshold, low_text,
-                                           poly)
-
-    # coordinate adjustment
-    boxes = craft_utils.adjustResultCoordinates(boxes, ratio_w, ratio_h)
-    polys = craft_utils.adjustResultCoordinates(polys, ratio_w, ratio_h)
-    for k in range(len(polys)):
-        if polys[k] is None: polys[k] = boxes[k]
-
-    t1 = time.time() - t1
-
-    # render results (optional)
-    render_img = score_text.copy()
-    render_img = np.hstack((render_img, score_link))
-    ret_score_text = imgproc.cvt2HeatmapImg(render_img)
-
-    if args.show_time : print("\ninfer/postproc time : {:.3f}/{:.3f}".format(t0, t1))
-
-    return boxes, polys, ret_score_text
+    return score_text, score_link
 
 
 
@@ -159,7 +132,7 @@ if __name__ == '__main__':
 
     t = time.time()
     droot,fname=os.path.split(image_list[0])
-    fouter=os.path.join(os.path.split(droot)[0],'craft','')
+    fouter=os.path.join(os.path.split(droot)[0],'raw_rest','')
     # load data
     if not os.path.isdir(fouter):
         os.mkdir(fouter)
@@ -170,16 +143,13 @@ if __name__ == '__main__':
         print("Test image {:d}/{:d}: {:s}".format(k+1, len(image_list), image_path), end='\r')
         image = imgproc.loadImage(image_path)
 
-        bboxes, polys, score_text = test_net(net, image, args.text_threshold, args.link_threshold, args.low_text, args.cuda, args.poly, refine_net)
+        score_text, score_linkt = test_net(net, image, args.text_threshold, args.link_threshold, args.low_text, args.cuda, args.poly, refine_net)
+
 
         # save score text
         filename, file_ext = os.path.splitext(os.path.basename(image_path))
-        mask_file = os.path.join(fouter,f'res_{filename}_mask.jpg')
+        mask_file = os.path.join(fouter,f'raw_{filename}.npz')
+        np.savez(mask_file, score_text=score_text, score_linkt=score_linkt,image=image)
 
-        # result_folder + "/res_" + filename + '_mask.jpg'
-        cv2.imwrite(mask_file, score_text)
-        # spath=os.path.join(fouter,f'{filename}.jpg')
-        # print(spath)
-        file_utils.saveResult(image_path, image[:,:,::-1], polys, dirname=fouter)
 
     print("elapsed time : {}s".format(time.time() - t))

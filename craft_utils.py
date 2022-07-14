@@ -7,7 +7,7 @@ MIT License
 import numpy as np
 import cv2
 import math
-
+from matplotlib import pyplot as plt
 """ auxilary functions """
 # unwarp corodinates
 def warpCoord(Minv, pt):
@@ -22,11 +22,24 @@ def getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text)
     textmap = textmap.copy()
     img_h, img_w = textmap.shape
 
+    # plt.subplot(2, 2, 1)
+    # plt.imshow(linkmap)
+
+    # plt.subplot(2, 2, 2)
+    # plt.imshow(textmap)
+    # plt.show()
     """ labeling method """
-    # low_text=0.1
-    # link_threshold=0.1
+
     ret, text_score = cv2.threshold(textmap, low_text, 1, 0)
     ret, link_score = cv2.threshold(linkmap, link_threshold, 1, 0)
+
+    # plt.subplot(2, 2, 3)
+    # plt.imshow(link_score)
+    # plt.subplot(2, 2, 4)
+    # plt.imshow(link_score)
+
+
+    plt.show()
 
     text_score_comb = np.clip(text_score + link_score, 0, 1)
     nLabels, labels, stats, centroids = cv2.connectedComponentsWithStats(text_score_comb.astype(np.uint8),
