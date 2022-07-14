@@ -2,31 +2,32 @@ from os import path as osp
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import math
 import itertools as it
 root='/home/cisir4/anaconda3/resources/ocsource/batch1/craft'
 # fname='res_N0_AG_EL' # Ideal image
-import math
-# fname='res_N0_AG_ES' # Example two box at the middle character.
+
+fname='res_N0_AG_ES' # Example two box at the middle character.
 # fname='res_N2_AB_MG' # Example two box at the bottom character.
 # fname='res_N2_AG_H9' # Example two box at the middle but with uneven box.
 # fname='res_N3_CE_I2' # Example two box at the bottom but with uneven box.
 # fname='res_N1_DG_Am' # Example two box at the bottom but with uneven box.
-fname='res_N3_CE_I2' # Example two box at the bottom but with uneven box.
+# fname='res_N3_CE_I2' # Example two box at the bottom but with uneven box.
 
 # fname='res_N0_AG_EX' # Example two box at the bottom but with uneven box.
 
 # fname='res_N2_AG_Cd' # Example two box at the middle and bottom character
 
 # fname='res_N1_DG_An' # Example two box at the middle and bottom character
-# fname='res_N1_DG_Bj' # Example missing left middle character
+# fname='res_N1_DG_BJ' # Example missing left middle character
 
 
 # fname='res_N2_DG_Bf' # Example missing left middle character
 # fname='res_N1_DG_AS' # Example missing left middle character
 
 
-
-
+# fname='res_N0_CE_A3_1'
+# fname='res_71_AH_Bv_1'
 # TO DO LAST
 # fname='res_N2_DG_Aj' # Example missing half middle and both bottom bbox (KIV)
 
@@ -37,8 +38,8 @@ img=osp.join(root,f'{fname}.jpg')
 bb=osp.join(root,f'{fname}.txt')
 # Load image, grayscale, median blur, sharpen image
 image = cv2.imread(img)
-# plt.imshow(image)
-# plt.show()
+plt.imshow(image)
+plt.show()
 nlim=image.shape[0]/2
 with open(bb) as file:
     lines = file.readlines()
@@ -50,11 +51,10 @@ Issue croping the RES_N0_AG_EX
 """
 # CentValMin=1000
 # CentValMax=1200
-CentValMin=nlim-100
-CentValMax=nlim+200
+CentValMin=nlim-200
+CentValMax=nlim+130
 
-charsHeight=90 # Typical height of a bb with two characters
-charsWidth=170  # Typical widht of a bb with two characters
+
 
 # First get only box at centre
 pot_val=[]
@@ -80,20 +80,39 @@ def nchars_determination(dpots):
     max_y=min(dpots['bboxes'][7],dpots['bboxes'][5])
     box_dim_coor=[min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]
 
-    # dst_img = image[min_y:max_y, min_x:max_x]
-    # plt.imshow(dst_img)
-    # plt.show()
+    dst_img = image[min_y:max_y, min_x:max_x]
+    plt.imshow(dst_img)
+    plt.show()
 
     #
     bwidht=abs(min_x-max_x)
     bheight=abs(min_y-max_y)
+
+    charsHeight=110 # Typical height of a bb with two characters
+    charsWidth=160  # Typical widht of a bb with two characters
+    """
+    'res_N1_DG_BJ'   (special case single 1>> 1: w:54 h:77 ; B >> 1: w:80 h:107
+    'res_N0_AG_EL'      w:188. h:118
+    'res_N0_CE_A3_1'    w:180. h:122
+    'res_71_AH_Bv_1'    w:168. h:130
+    'res_N0_AG_ES'      N0:w:180. h:119
+    """
+
 
     if bwidht>charsWidth:
         nchar=2
     else:
         nchar=1
 
+    if (nchar==1) & (bheight<charsHeight):
+        vchar=1
+    elif (nchar==2) & (bheight<charsHeight):
+        vchar=1
+    else:
+        vchar=3
+
     dpots.update(dict(nchar=nchar,
+                      vchar=vchar,
                       box_dim_coor=box_dim_coor,
                       bheight=bheight,
                       bwidht=bwidht))
@@ -213,6 +232,9 @@ def combine_modular_bboxes (dpots):
         j=1
         # Get the possible box dimension
     h=1
+def disintegrate_bbox(dpots):
+    h=1
+# combine_modular_bboxes (pot_val)
 
-combine_modular_bboxes (pot_val)
+disintegrate_bbox(pot_val)
 y=1

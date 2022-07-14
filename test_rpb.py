@@ -43,17 +43,19 @@ def copyStateDict(state_dict):
 def str2bool(v):
     return v.lower() in ("yes", "y", "true", "t", "1")
 
+# /home/cisir4/anaconda3/resources/ocsource/batch1/test_resize
+# '/home/cisir4/anaconda3/resources/ocsource/batch1/imgs'
 parser = argparse.ArgumentParser(description='CRAFT Text Detection')
 parser.add_argument('--trained_model', default='/home/cisir4/anaconda3/resources/ocsource/train_detect/craft_mlt_25k.pth', type=str, help='pretrained model')
 parser.add_argument('--text_threshold', default=0.1, type=float, help='text confidence threshold')
 parser.add_argument('--low_text', default=0.3, type=float, help='text low-bound score')
 parser.add_argument('--link_threshold', default=0.4, type=float, help='link confidence threshold')
-parser.add_argument('--cuda', default=True, type=str2bool, help='Use cuda for inference')
-parser.add_argument('--canvas_size', default=1280, type=int, help='image size for inference')
+parser.add_argument('--cuda', default=False, type=str2bool, help='Use cuda for inference')
+parser.add_argument('--canvas_size', default=2048, type=int, help='image size for inference')
 parser.add_argument('--mag_ratio', default=1.5, type=float, help='image magnification ratio')
 parser.add_argument('--poly', default=False, action='store_true', help='enable polygon type')
-parser.add_argument('--show_time', default=False, action='store_true', help='show processing time')
-parser.add_argument('--test_folder', default='/home/cisir4/anaconda3/resources/ocsource/batch2/imgs', type=str, help='folder path to input images')
+parser.add_argument('--show_time', default=True, action='store_true', help='show processing time')
+parser.add_argument('--test_folder', default='/home/cisir4/anaconda3/resources/ocsource/batch1/test_resize', type=str, help='folder path to input images')
 parser.add_argument('--refine', default=False, action='store_true', help='enable link refiner')
 parser.add_argument('--refiner_model', default='weights/craft_refiner_CTW1500.pth', type=str, help='pretrained refiner model')
 
@@ -99,7 +101,9 @@ def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, r
     t1 = time.time()
 
     # Post-processing
-    boxes, polys = craft_utils.getDetBoxes(score_text, score_link, text_threshold, link_threshold, low_text, poly)
+    boxes, polys = craft_utils.getDetBoxes(score_text, score_link,
+                                           text_threshold, link_threshold, low_text,
+                                           poly)
 
     # coordinate adjustment
     boxes = craft_utils.adjustResultCoordinates(boxes, ratio_w, ratio_h)
