@@ -132,8 +132,8 @@ def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
         nbbls=[]
 
         for dcent in bb_ls:
-            t=dcent['cent'][0]
-            if CentValMin<dcent['cent'][0]<CentValMax:
+            t=dcent['cent'][1]
+            if (CentValMin<dcent['cent'][0]<CentValMax) &(60<dcent['cent'][1]<700):
                 nbbls.append(dcent)
                 j=1
         # pot_val.append(dict(bboxes=lst_int))
@@ -160,23 +160,34 @@ def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
 
         # g=stats[dmapper, cv2.CC_STAT_WIDTH].tolist()
         h=1
-        if nvar_width>20:
+        if nvar_width>10:
             """
             This apply for 
           
             """
             # High chances there is a bbox size mismatch.
             # For time being (although i expect thing to be modified later, we maximise the bbox base on the largest bbox as our box reference
-            arr=np.array(det)
-            xa,_=arr[:,0,:].min(axis=0) # Coordinate for TopLeft
-            xb,_=arr[:,1,:].max(axis=0) # Coordinate for TopRight. We ignore the y-output
+            mxwidtht=np.amax(bwidth)
+            idx_ref = np.where(bwidth == np.amax(bwidth))[0].tolist()[0]
+            xxis=0
+            yxis=1
+            xleft_ref=bb_ls[idx_ref ]['bb'][0,xxis]
+            xright_ref=bb_ls[idx_ref ]['bb'][1,xxis]
+            for idx in range(len(bb_ls)):
+                dheight=bb_ls[idx]['width']
+                diff_width=(mxwidtht-dheight)/2
+                if diff_width>15:
+                    # Adjust the bbox so that it widen in the up and bottom direction (Y axis)
+                    # cval=bb_ls[idx]['bb'][[0],0]
+                    xxis=0
+                    yxis=1
 
-            # Now we modify all the bbox x-coordinate according to the largest bb available. There is high chances the existance of multiple singular character
-            # for dk in range (len(det)):
-            arr[:,[0,3],0]=xa
-            arr[:,[1,2],0]=xb
-            det=arr.tolist()
-            jj=1
+
+                    bb_ls[idx]['bb'][[0,3],xxis]=xleft_ref
+                    bb_ls[idx]['bb'][[1,2],xxis]=xright_ref
+
+
+
         if nvar_height>5:
             # bbs_height=stats[dmapper, cv2.CC_STAT_HEIGHT].tolist()
             mxheihgt=np.max(bheight)
@@ -194,17 +205,9 @@ def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
                     ya=bb_ls[idx]['bb'][0,yxis] # Top
                     yd=bb_ls[idx]['bb'][3,yxis] # Bottom
                     bb_ls[idx]['bb'][[0,1],yxis]=ya-diff_height
-                    # ee=bb_ls[idx]['bb'][3,1]
-                    # rr=ee+(diff_height)
                     bb_ls[idx]['bb'][[2,3],yxis]=yd+diff_height
-
                     bb_ls[idx]['height']=bb_ls[idx]['bb'][3,yxis]-bb_ls[idx]['bb'][0,yxis]
 
-                    # We also need to adjust the stats, since we might use it along the pipeline
-
-                    # xa,_=arr[:,0,:].min(axis=0) # Coordinate for TopLeft
-                    # xb,_=arr[:,1,:].max(axis=0) # Coordinate for TopRight. We ignore the y-output
-                    g=1
 
     elif nbox==2:
         # At this stage, we always assume, the second and third row always combined
@@ -239,6 +242,10 @@ def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
         bb_ls=[bb_ls[0],dic_mid,dic_bot]
         w=1
 
+    ### SOMETIME, THERE IS another stray box that stay at the top of upper most character, need to find a way to drop this
+    nbox=len(bb_ls)
+    if nbox >=4:
+        print('Need to remove the extra box, which is located at the upper most region')
     ff=1
     h=1
     # return det, labels, mapper,text_score_dilate
@@ -295,8 +302,8 @@ batch_idx=2
 # path_all = glob ( f"/home/cisir4/anaconda3/resources/ocsource/batch{batch_idx}/raw_rest/*.npz" )
 
 
-fname='raw_N3_DA_GJ_4'
-# fname='raw_N2_AF_Bn_1'
+# fname='raw_N3_DA_GJ_4'
+fname='raw_N3_DA_Im_1'
 path_all=[f"/home/cisir4/anaconda3/resources/ocsource/batch{batch_idx}/raw_rest/{fname}.npz" ]
 # all_path=d
 for dpath in tqdm(path_all):
