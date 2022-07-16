@@ -133,7 +133,7 @@ def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
 
         for dcent in bb_ls:
             t=dcent['cent'][1]
-            if (CentValMin<dcent['cent'][0]<CentValMax) &(60<dcent['cent'][1]<700):
+            if (CentValMin<dcent['cent'][0]<CentValMax) &(60<dcent['cent'][1]<800):
                 nbbls.append(dcent)
                 j=1
         # pot_val.append(dict(bboxes=lst_int))
@@ -303,7 +303,7 @@ batch_idx=2
 
 
 # fname='raw_N3_DA_GJ_4'
-fname='raw_N3_DA_Im_1'
+fname='raw_N3_DA_IY_2'
 path_all=[f"/home/cisir4/anaconda3/resources/ocsource/batch{batch_idx}/raw_rest/{fname}.npz" ]
 # all_path=d
 for dpath in tqdm(path_all):
