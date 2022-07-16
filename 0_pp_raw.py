@@ -1,92 +1,59 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2
-fpath='/home/cisir4/anaconda3/resources/ocsource/batch1/raw_rest/raw_NI_DG_Bf.npz'
-
 import math
+from os import path as osp
+import os
+import statistics
+# from glob import glob
+from tqdm import tqdm
+def getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,sep_vertH,sep_vertW):
 
-def getDetBoxes_core(image_x,textmap, linkmap, text_threshold, link_threshold, low_text):
     # prepare data
-    import copy
 
-    linkmap = linkmap.copy()
     textmap = textmap.copy()
-    cross_check=copy.deepcopy(textmap)
+
     img_h, img_w = textmap.shape
 
-    # pts=np.array([[418, 216.], [507, 216.],
-    #               [507, 250.], [418, 250.]],
-    #              np.int32)
 
-    # pts = pts.reshape((-1, 1, 2))
-    # img_box=cv2.polylines(cross_check, [pts], True,1,thickness=2)
-    # plt.imshow(img_box)
-    # plt.show()
-
-    # plt.subplot(2, 2, 1)
-    # plt.imshow(linkmap)
-
-    # plt.subplot(2, 2, 1)
-    # plt.imshow(image)
     """ labeling method """
 
     # Creating kernel
-    kernel = np.ones((10, 10), np.uint8)
+    # Try to seperate between level
+    # sep_vert=10
+    kernel = np.ones((sep_vertH, sep_vertW), np.uint8)
 
-    # Using cv2.erode() method
     image = cv2.erode(textmap.copy(), kernel)
 
-    # plt.subplot(2, 2, 2)
-    # plt.imshow(image)
+
 
     # Adjust these two value to get a good bbox
-    dil_hor=20
-    dil_ver=10
-
+    # dil_hor=20
+    # dil_ver=10
+    # sep_vert=10
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, ksize=(dil_hor, dil_ver))
 
     dilated = cv2.dilate(image, kernel)
 
-    # plt.subplot(2, 2, 3)
-    # plt.imshow(dilated)
-
-    # plt.show()
 
     low_dilate=0.3
     ret, text_score_dilate = cv2.threshold(dilated, low_dilate, 1, 0)
 
-    # plt.subplot(2, 2, 4)
-    # plt.imshow(text_score_dilate)
 
-    # plt.show()
-
-    # ret, link_score = cv2.threshold(linkmap, link_threshold, 1, 0)
-    #
-    # plt.subplot(2, 2, 3)
-    # plt.imshow(text_score_dilate )
-    # plt.subplot(2, 2, 4)
-    # plt.imshow(text_score)
-
-
-    # plt.show()
-
-    # text_score_comb = np.clip(text_score + link_score, 0, 1)
     nLabels, labels, stats, centroids = cv2.connectedComponentsWithStats(text_score_dilate.astype(np.uint8),4,cv2.CV_32S)
 
-    # Always omit first index as in refer to the cp of big image
-    # plt.imshow(text_score_dilate)
-    # plt.scatter(centroids[1:,0], centroids[1:,1], c ="blue",s=5,marker='^')
-    # plt.show()
+
+
+
     det = []
     mapper = []
+    cent=[]
+    bb_ls=[]
     for k in range(1,nLabels):
         # size filtering
         size = stats[k, cv2.CC_STAT_AREA]
-        if size < 1000: continue
+        if size < char_s: continue
 
-        # thresholding
-        # if np.max(textmap[labels==k]) < text_threshold: continue
-        print(f'The box size is: {size}')
         # make segmentation map
         segmap = np.zeros(textmap.shape, dtype=np.uint8)
         segmap[labels==k] = 255
@@ -121,20 +88,161 @@ def getDetBoxes_core(image_x,textmap, linkmap, text_threshold, link_threshold, l
         startidx = box.sum(axis=1).argmin()
         box = np.roll(box, 4-startidx, 0)
         box = np.array(box)
+        # mcent=centroids[k]
+        # cent.append(mcent)
+        # det.append(box)
+        # mapper.append(k)
+        xxis=0
+        yxis=1
+        bheight=box[3,yxis]-box[0,yxis] # between y axis
+        bwidth=box[2,xxis]-box[0,xxis] # between x axis
+        # if diff_height != h:
+        #     print('the height are same')
+        #
+        # if diff_width != w:
+        #     print('the weight are same')
+        bb_ls.append(dict(bb=box,
+                          cent=centroids[k],
+                          mapper=k,
+                          height=bheight,
+                          width=bwidth))
+        t=1
 
-        det.append(box)
-        mapper.append(k)
 
-    # pts=np.array([[418, 216.], [507, 216.],
-    #               [507, 250.], [418, 250.]],
-    #               np.int32)
 
-    # pts = pts.reshape((-1, 1, 2))
-    # img_box=cv2.polylines(cross_check, [pts], True,1,thickness=2)
-    # plt.imshow(img_box)
-    # plt.show()
-    r=1
-    return det, labels, mapper
+    # Lets do further checking.
+    """
+    
+    # Also, convert the distance to a ratio 
+    # Get the box centroid,stats.
+    
+    # get point(coordinate) that almost vertical to each other.
+    # 
+    """
+    nlim=0
+    CentValMin=300
+    CentValMax=600
+    # Check how many bbox availabe
+    nbox=len(bb_ls)
+
+    ## I think it is best first remove unnecesary bbox.
+    # gg=stats[mapper, cv2.CC_STAT_AREA].tolist()
+
+    if nbox >=4:
+        nbbls=[]
+
+        for dcent in bb_ls:
+            t=dcent['cent'][0]
+            if CentValMin<dcent['cent'][0]<CentValMax:
+                nbbls.append(dcent)
+                j=1
+        # pot_val.append(dict(bboxes=lst_int))
+        s=1
+        bb_ls=nbbls
+
+
+    nbox=len(bb_ls)
+    if nbox==3:
+
+        det = list(map (lambda x:x['bb'],bb_ls))
+        bheight=np.array(list(map (lambda x:x['height'],bb_ls)))
+        bwidth=np.array(list(map (lambda x:x['width'],bb_ls)))
+        arr=np.array(det)
+        # I want to know if all have same size, this is identify if there is a single character
+
+        dmapper= [ item['mapper'] for item in  bb_ls ]
+
+        # nvar_area=statistics.stdev(stats[dmapper, cv2.CC_STAT_AREA].tolist())
+
+
+        nvar_height=np.std(bheight)
+        nvar_width=np.std(bwidth)
+
+        # g=stats[dmapper, cv2.CC_STAT_WIDTH].tolist()
+        h=1
+        if nvar_width>20:
+            """
+            This apply for 
+          
+            """
+            # High chances there is a bbox size mismatch.
+            # For time being (although i expect thing to be modified later, we maximise the bbox base on the largest bbox as our box reference
+            arr=np.array(det)
+            xa,_=arr[:,0,:].min(axis=0) # Coordinate for TopLeft
+            xb,_=arr[:,1,:].max(axis=0) # Coordinate for TopRight. We ignore the y-output
+
+            # Now we modify all the bbox x-coordinate according to the largest bb available. There is high chances the existance of multiple singular character
+            # for dk in range (len(det)):
+            arr[:,[0,3],0]=xa
+            arr[:,[1,2],0]=xb
+            det=arr.tolist()
+            jj=1
+        if nvar_height>5:
+            # bbs_height=stats[dmapper, cv2.CC_STAT_HEIGHT].tolist()
+            mxheihgt=np.max(bheight)
+            # mheight=bbs_height.index(max(bbs_height))
+
+            for idx in range(len(bb_ls)):
+                dheight=bb_ls[idx]['height']
+                diff_height=(mxheihgt-dheight)/2
+                if diff_height>5:
+                    # Adjust the bbox so that it widen in the up and bottom direction (Y axis)
+                    # cval=bb_ls[idx]['bb'][[0],0]
+                    xxis=0
+                    yxis=1
+
+                    ya=bb_ls[idx]['bb'][0,yxis] # Top
+                    yd=bb_ls[idx]['bb'][3,yxis] # Bottom
+                    bb_ls[idx]['bb'][[0,1],yxis]=ya-diff_height
+                    # ee=bb_ls[idx]['bb'][3,1]
+                    # rr=ee+(diff_height)
+                    bb_ls[idx]['bb'][[2,3],yxis]=yd+diff_height
+
+                    bb_ls[idx]['height']=bb_ls[idx]['bb'][3,yxis]-bb_ls[idx]['bb'][0,yxis]
+
+                    # We also need to adjust the stats, since we might use it along the pipeline
+
+                    # xa,_=arr[:,0,:].min(axis=0) # Coordinate for TopLeft
+                    # xb,_=arr[:,1,:].max(axis=0) # Coordinate for TopRight. We ignore the y-output
+                    g=1
+
+    elif nbox==2:
+        # At this stage, we always assume, the second and third row always combined
+        # First, find the horizontal midline
+
+        # I am not in favor of this approach, usually, set higher sep_vertW to 16 should do the trick especially for 'raw_N3_DA_GJ_4'
+        idx=1
+        ya=bb_ls[idx]['bb'][0,yxis] # Top
+        yd=bb_ls[idx]['bb'][3,yxis] # Bottom
+        ymidline=ya+((yd-ya)/2)  # Our horizontal midline coordinate
+        xa=bb_ls[idx]['bb'][0,0]
+        xb=bb_ls[idx]['bb'][1,0]
+        # Coordinate for midle box
+        bb_mid=np.array([bb_ls[idx]['bb'][0,:],
+                         bb_ls[idx]['bb'][1,:],
+                         [xb,ymidline],
+                         [xa,ymidline]])
+        dic_mid=dict(bb=bb_mid,
+                     mapper='NA',
+                     height=ymidline-bb_ls[idx]['bb'][0,1],
+                     width=xb-xa)
+
+        bb_bot=np.array([[xa,ymidline],
+                        [xb,ymidline],
+                        bb_ls[idx]['bb'][2,:],
+                        bb_ls[idx]['bb'][3,:]])
+
+        dic_bot=dict(bb=bb_bot,
+                     mapper='NA',
+                     height=bb_ls[idx]['bb'][3,1]-ymidline,
+                     width=xb-xa)
+        bb_ls=[bb_ls[0],dic_mid,dic_bot]
+        w=1
+
+    ff=1
+    h=1
+    # return det, labels, mapper,text_score_dilate
+    return bb_ls,text_score_dilate
 
 def adjustResultCoordinates(polys, ratio_w, ratio_h, ratio_net = 2):
     if len(polys) > 0:
@@ -145,32 +253,82 @@ def adjustResultCoordinates(polys, ratio_w, ratio_h, ratio_net = 2):
     return polys
 
 
-data = np.load(fpath)
-textmap=data['score_text']
-linkmap=data['score_linkt']
-image=data['image']
-text_threshold=0.2
-link_threshold=0.2
-low_text=0.2
-boxes, labels, mapper = getDetBoxes_core(image,textmap, linkmap,
-                                         text_threshold, link_threshold,
-                                         low_text)
 
-ratio_h =  1.1953125
-ratio_w =1.1953125
-target_ratio = 0.8366013071895425
+def process_img(image,textmap,linkmap,spath):
+    dil_hor=30
+    dil_ver=10
+    sep_vertW=15
+    sep_vertH=10
+    char_s=400
 
-boxes = adjustResultCoordinates(boxes, ratio_w, ratio_h)
+    bb_dic,img_dil=getDetBoxes_core(textmap, char_s,dil_hor,dil_ver,
+                                                   sep_vertH,sep_vertW)
 
-
-img = np.array(image)
-for dbox in boxes:
-
-    pts = dbox.reshape((-1, 1, 2)).astype(np.int32)
-    cv2.polylines(img, [pts], True,1,thickness=2)
+    ratio_h =  1.1953125
+    ratio_w =1.1953125
+    target_ratio = 0.8366013071895425
+    # plt.imshow(linkmap)
+    # plt.show()
+    boxes=list(map (lambda x:x['bb'],bb_dic))
+    boxes = adjustResultCoordinates(boxes, ratio_w, ratio_h)
 
 
-plt.imshow(img)
-plt.show()
+    img = np.array(image)
+    for dbox in boxes:
 
-h=1
+        pts = dbox.reshape((-1, 1, 2)).astype(np.int32)
+        cv2.polylines(img, [pts], True,1,thickness=5)
+
+
+
+    plt.figure(figsize = (16,8))
+    plt.subplot(1, 2, 1), plt.imshow(img, 'gray')
+    plt.subplot(1, 2, 2), plt.imshow(img_dil, 'gray')
+    plt.tight_layout()
+    plt.show()
+    # plt.savefig(spath) # To save figure
+    # plt.close('all')
+    h=1
+
+
+batch_idx=2
+# path_all = glob ( f"/home/cisir4/anaconda3/resources/ocsource/batch{batch_idx}/raw_rest/*.npz" )
+
+
+fname='raw_N3_DA_GJ_4'
+# fname='raw_N2_AF_Bn_1'
+path_all=[f"/home/cisir4/anaconda3/resources/ocsource/batch{batch_idx}/raw_rest/{fname}.npz" ]
+# all_path=d
+for dpath in tqdm(path_all):
+    # fpath='/home/cisir4/anaconda3/resources/ocsource/batch1/raw_rest/raw_NI_DG_Bf.npz'
+    data = np.load(dpath)
+    textmap=data['score_text']
+    linkmap=data['score_linkt']
+    image=data['image']
+
+
+
+    rdir,fname=osp.split(dpath)
+    droot,_=osp.split(rdir)
+    droot=osp.join(droot,'dilation_approach')
+    if not osp.isdir(droot):
+        os.mkdir(droot)
+
+    dname=fname.split('.npz')[0]
+    spath=osp.join(droot,f'{dname}.jpg')
+
+    process_img(image,textmap,linkmap,spath)
+
+
+    # cv2.imwrite(spath, img)
+    # rom PIL import Image
+    # img = Image.fromarray(img)
+
+    # print(tesserocr.image_to_text(img))
+
+    # np_img = np.array(img)
+    # cv2.imshow('plate',  np_img)
+
+    j=1
+
+print('COMPLETE')
